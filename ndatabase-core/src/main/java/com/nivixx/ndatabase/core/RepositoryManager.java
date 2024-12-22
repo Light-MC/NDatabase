@@ -27,14 +27,10 @@ public class RepositoryManager<K,V extends NEntity<K>> {
     private final Map<Class<V>, Repository<K,V>> repositoryCache;
 
     private final DatabaseTypeResolver databaseTypeResolver;
-    private final CacheRepoConfig cacheRepoConfig;
 
     public RepositoryManager() {
         this.repositoryCache = new ConcurrentHashMap<>();
         this.databaseTypeResolver = new DatabaseTypeResolver();
-
-        NDatabaseConfig nDatabaseConfig = Injector.resolveInstance(NDatabaseConfig.class);
-        this.cacheRepoConfig = nDatabaseConfig.getCacheRepoConfig();
     }
 
     public Repository<K,V> getOrCreateRepository(Class<V> entityType) throws NDatabaseException {
@@ -67,6 +63,9 @@ public class RepositoryManager<K,V extends NEntity<K>> {
         }
         dao.createIndexes(indexSingleNodePathList);
 
+        CacheRepoConfig cacheRepoConfig = Injector.resolveInstance(NDatabaseConfig.class).getCacheRepoConfig();
+
+
         // Init repository
         DBLogger dbLogger = Injector.resolveInstance(DBLogger.class);
         SyncExecutor syncExecutor = Injector.resolveInstance(SyncExecutor.class);
@@ -76,13 +75,16 @@ public class RepositoryManager<K,V extends NEntity<K>> {
                 new RepositoryImpl<>(dao, entityType, syncExecutor, asyncThreadPool, dbLogger);
         repositoryCache.put(entityType, repository);
 
+        System.out.println("Size of cache: " + repositoryCache.size());
+
         return repository;
     }
 
     public void shutdownCache() throws NDatabaseException {
+        System.out.println("Shutting down cached repositories. Amount: " + repositoryCache.size());
         for (Repository<?, ?> repository : repositoryCache.values()) {
             if (repository instanceof CachedRepositoryImpl) {
-                ((CachedRepositoryImpl<?, ?>) repository).flushCache();
+                ((CachedRepositoryImpl<?, ?>) repository).shutdown();
             }
         }
         repositoryCache.clear();

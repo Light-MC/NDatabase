@@ -54,11 +54,6 @@ public class NDatabasePlugin {
         loadPlatform();
     }
 
-    @Listener
-    public void onDisable(final StoppedGameEvent event) {
-        NDatabase.api().shutdown(); // flush cache
-    }
-
     private void loadPlatform() {
 
         try {

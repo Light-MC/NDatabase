@@ -30,6 +30,7 @@ public class CachedRepositoryImpl<K, V extends NEntity<K>> implements Repository
     private final AsyncThreadPool asyncThreadPool;
     private final DBLogger dbLogger;
     private final CacheRepoConfig cacheConfig;
+    private final Dao<K, V> dao;
 
     public CachedRepositoryImpl(Dao<K, V> dao,
                           Class<V> classz,
@@ -41,6 +42,7 @@ public class CachedRepositoryImpl<K, V extends NEntity<K>> implements Repository
         this.asyncThreadPool = asyncThreadPool;
         this.dbLogger = dbLogger;
         this.cacheConfig = cacheConfig;
+        this.dao = dao;
 
         Caffeine<Object, Object> builder = Caffeine.newBuilder()
                 .expireAfterAccess(cacheConfig.getExpireAfterAccessMinutes(), TimeUnit.MINUTES)
@@ -60,22 +62,36 @@ public class CachedRepositoryImpl<K, V extends NEntity<K>> implements Repository
         }
 
         this.cache = builder
-                .evictionListener((K key, V value, RemovalCause cause) -> {
-                    if (value != null && (cause.wasEvicted() || cause == RemovalCause.REPLACED)) {
+                .removalListener((K key, V value, RemovalCause cause) -> {
+                    dbLogger.logInfo("Cached entity: " + key + " was evicted");
+                    try {
                         dao.upsert(value);
+                    } catch (NDatabaseException e) {
+                        dbLogger.logError(e, "Error flushing entity from cache");
+                        return;
                     }
+
+                    dbLogger.logInfo("Upserted entity with key: " + key);
                 })
                 .buildAsync((key, executor) -> CompletableFuture.supplyAsync(
                         () -> dao.get(key, classz),
                         asyncThreadPool.getExecutor()
                 ));
-
     }
 
     @Override
     public V get(K key) throws NDatabaseException {
         try {
-            return cache.get(key).get(cacheConfig.getGetTimeoutSeconds(), TimeUnit.SECONDS);
+            CompletableFuture<V> future = cache.get(key);
+
+            boolean hitCache = cache.synchronous().asMap().containsKey(key);
+            if (hitCache) {
+                dbLogger.logInfo("Cache hit for key: " + key);
+            } else {
+                dbLogger.logInfo("Cache miss for key: " + key);
+            }
+
+            return future.get(cacheConfig.getGetTimeoutSeconds(), TimeUnit.SECONDS);
         } catch (Exception e) {
             throw new NDatabaseException("Failed to get value from cache", e);
         }
@@ -83,20 +99,31 @@ public class CachedRepositoryImpl<K, V extends NEntity<K>> implements Repository
 
     @Override
     public Promise.AsyncResult<V> getAsync(K key) {
-        return new PromiseResultPipeline<>(cache.get(key), syncExecutor, asyncThreadPool, dbLogger);
-    }
+        boolean hitCache = cache.synchronous().asMap().containsKey(key);
+        if (hitCache) {
+            dbLogger.logInfo("Cache hit for key: " + key);
+        } else {
+            dbLogger.logInfo("Cache miss for key: " + key);
+        }
+
+        return new PromiseResultPipeline<>(cache.get(key), syncExecutor, asyncThreadPool, dbLogger);    }
 
     @Override
     public Promise.AsyncResult<Optional<V>> findOneAsync(Predicate<V> predicate) {
-        CompletableFuture<Optional<V>> future = CompletableFuture.supplyAsync(() ->
-                        cache.synchronous()
-                                .asMap()
-                                .values()
-                                .stream()
-                                .filter(predicate)
-                                .findFirst(),
-                asyncThreadPool.getExecutor()
-        );
+        CompletableFuture<Optional<V>> future = CompletableFuture.supplyAsync(() -> {
+            Optional<V> result = cache.synchronous()
+                    .asMap()
+                    .values()
+                    .stream()
+                    .filter(predicate)
+                    .findFirst();
+            if (result.isPresent()) {
+                dbLogger.logInfo("Cache hit for value matching predicate: " + result.get());
+            } else {
+                dbLogger.logInfo("Cache miss for value matching predicate (none found).");
+            }
+            return result;
+        }, asyncThreadPool.getExecutor());
         return new PromiseResultPipeline<>(future, syncExecutor, asyncThreadPool, dbLogger);
     }
 
@@ -107,13 +134,21 @@ public class CachedRepositoryImpl<K, V extends NEntity<K>> implements Repository
 
     @Override
     public Promise.AsyncResult<List<V>> findAsync(Predicate<V> predicate) {
-        CompletableFuture<List<V>> future = CompletableFuture.supplyAsync(() ->
-                        cache.synchronous()
-                                .asMap()
-                                .values()
-                                .stream()
-                                .filter(predicate)
-                                .collect(Collectors.toList()),
+        CompletableFuture<List<V>> future = CompletableFuture.supplyAsync(() -> {
+                    List<V> result = cache.synchronous()
+                            .asMap()
+                            .values()
+                            .stream()
+                            .filter(predicate)
+                            .collect(Collectors.toList());
+
+                    if (!result.isEmpty()) {
+                        dbLogger.logInfo("Cache hit for values matching predicate: " + result.size() + " items found.");
+                    } else {
+                        dbLogger.logInfo("Cache miss for values matching predicate (none found).");
+                    }
+                    return result;
+                },
                 asyncThreadPool.getExecutor()
         );
         return new PromiseResultPipeline<>(future, syncExecutor, asyncThreadPool, dbLogger);
@@ -170,11 +205,15 @@ public class CachedRepositoryImpl<K, V extends NEntity<K>> implements Repository
     @Override
     public void delete(K key) throws NDatabaseException {
         cache.synchronous().asMap().remove(key);
+        dao.delete(key);
     }
 
     @Override
     public Promise.AsyncEmptyResult deleteAsync(K key)  {
-        CompletableFuture<Void> future = CompletableFuture.runAsync(() -> cache.asMap().remove(key));
+        CompletableFuture<Void> future = CompletableFuture.runAsync(() -> {
+            cache.asMap().remove(key);
+            dao.delete(key);
+        });
         return new PromiseEmptyResultPipeline<>(future, syncExecutor, asyncThreadPool, dbLogger);
     }
 
@@ -191,11 +230,15 @@ public class CachedRepositoryImpl<K, V extends NEntity<K>> implements Repository
     @Override
     public void deleteAll() throws NDatabaseException {
         cache.synchronous().asMap().clear();
+        dao.deleteAll();
     }
 
     @Override
     public Promise.AsyncEmptyResult deleteAllAsync() throws NDatabaseException {
-        CompletableFuture<Void> future = CompletableFuture.runAsync(() -> cache.asMap().clear());
+        CompletableFuture<Void> future = CompletableFuture.runAsync(() -> {
+            cache.asMap().clear();
+            dao.deleteAll();
+        });
         return new PromiseEmptyResultPipeline<>(future, syncExecutor, asyncThreadPool, dbLogger);
     }
 
@@ -251,12 +294,23 @@ public class CachedRepositoryImpl<K, V extends NEntity<K>> implements Repository
         throw new UnsupportedOperationException("The provided predicate is SQL-based and cannot be applied to in-memory objects.");
     }
 
-    public Promise.AsyncResult<Map<K, V>> getAllAsync(Collection<K> keys) {
-        CompletableFuture<Map<K, V>> future = cache.getAll(keys);
-        return new PromiseResultPipeline<>(future, syncExecutor, asyncThreadPool, dbLogger);
+    public void flushCache() {
+        dbLogger.logInfo("Flushing cache");
+        cache.synchronous().invalidateAll();
     }
 
-    public void flushCache() {
-        cache.synchronous().invalidateAll();
+    public void shutdown() throws NDatabaseException {
+        Map<K, V> cachedValues = cache.synchronous().asMap();
+        dbLogger.logInfo("Shutting down cache with values: " + cachedValues);
+        for (Map.Entry<K, V> entry : cachedValues.entrySet()) {
+            try {
+                dbLogger.logInfo("Flushing cache entry: " + entry.getKey());
+                dao.upsert(entry.getValue());
+            } catch (NDatabaseException e) {
+                dbLogger.logError(e, "Error upserting entity during shutdown: " + entry.getKey());
+            }
+        }
+        // no invalidation, as the cache will be wiped on the shutdown (all in memory)
+        // we cannot trigger the removal listener because the jar has been unloaded by bukkit
     }
 }
