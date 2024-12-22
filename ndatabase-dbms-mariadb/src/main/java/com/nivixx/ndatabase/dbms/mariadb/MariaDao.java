@@ -7,6 +7,7 @@ import com.nivixx.ndatabase.expressiontree.SingleNodePath;
 import com.nivixx.ndatabase.platforms.coreplatform.logging.DBLogger;
 
 import java.sql.Connection;
+import java.sql.DatabaseMetaData;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.text.MessageFormat;
@@ -38,9 +39,6 @@ public class MariaDao<K, V extends NEntity<K>> extends JdbcDao<K,V> {
     }
 
     protected void denormalizeFieldIntoColumn(Connection connection, SingleNodePath singleNodePath) throws SQLException {
-
-        // path.to.field
-        // MYSQL doesn't allow "." in column names
         String columnName = singleNodePath.getFullPath("_");
         String fieldPath = singleNodePath.getFullPath(".");
         Class<?> fieldType = singleNodePath.getLastNodeType();
