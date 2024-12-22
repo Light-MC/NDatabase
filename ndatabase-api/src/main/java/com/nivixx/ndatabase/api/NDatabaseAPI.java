@@ -26,4 +26,11 @@ public interface NDatabaseAPI {
      */
     <K,V extends NEntity<K>> Repository<K,V> getOrCreateRepository(Class<V> entityType) throws NDatabaseException;
 
+    /**
+     * Call this method in the shutdown hook of the plugin. This ensures that the cache is properly flushed and
+     * everything is saved.
+     *
+     * @throws NDatabaseException If a commit to the database has failed
+     */
+    void shutdown() throws NDatabaseException;
 }

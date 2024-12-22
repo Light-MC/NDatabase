@@ -14,7 +14,6 @@ import com.nivixx.ndatabase.dbms.mysql.MysqlDao;
 import com.nivixx.ndatabase.dbms.sqlite.SqliteConnectionPool;
 import com.nivixx.ndatabase.dbms.sqlite.SqliteDao;
 import com.nivixx.ndatabase.platforms.coreplatform.logging.DBLogger;
-import net.byteflux.libby.LibraryManager;
 
 import java.lang.annotation.Annotation;
 

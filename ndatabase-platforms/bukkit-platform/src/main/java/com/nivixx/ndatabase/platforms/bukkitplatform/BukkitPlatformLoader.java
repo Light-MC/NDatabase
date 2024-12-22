@@ -1,6 +1,7 @@
 package com.nivixx.ndatabase.platforms.bukkitplatform;
 
 import com.nivixx.ndatabase.core.PlatformLoader;
+import com.nivixx.ndatabase.core.cache.CacheRepoConfig;
 import com.nivixx.ndatabase.core.config.*;
 import com.nivixx.ndatabase.dbms.mariadb.MariaDBConfig;
 import com.nivixx.ndatabase.dbms.mongodb.MongoDBConfig;
@@ -73,6 +74,24 @@ public class BukkitPlatformLoader extends PlatformLoader {
         mongoDBConfig.setUser(mongoDBUser);
         mongoDBConfig.setPass(mongoDBPass);
 
+        ConfigurationSection cache = config.getConfigurationSection("cache");
+        CacheRepoConfig cacheRepoConfig = new CacheRepoConfig();
+        long expireAfterAccessMinutes = cache.getLong("expire-after-access-minutes", 30);
+        long maximumSize = cache.getLong("maximum-size", 10_000);
+        int getTimeoutSeconds = cache.getInt("get-timeout-seconds", 5);
+        boolean enableSoftValues = cache.getBoolean("enable-soft-values", false);
+        boolean enableRefreshAfterWrite = cache.getBoolean("enable-refresh-after-write", false);
+        long refreshAfterWriteMinutes = cache.getLong("refresh-after-write-minutes", 30);
+        boolean enableStats = cache.getBoolean("enable-stats", false);
+
+        cacheRepoConfig.setExpireAfterAccessMinutes(expireAfterAccessMinutes);
+        cacheRepoConfig.setMaximumSize(maximumSize);
+        cacheRepoConfig.setGetTimeoutSeconds(getTimeoutSeconds);
+        cacheRepoConfig.setEnableSoftValues(enableSoftValues);
+        cacheRepoConfig.setEnableRefreshAfterWrite(enableRefreshAfterWrite);
+        cacheRepoConfig.setRefreshAfterWriteMinutes(refreshAfterWriteMinutes);
+        cacheRepoConfig.setEnableStats(enableStats);
+
         boolean debug = config.getBoolean("debug-mode", false);
 
         BukkitNDatabaseConfig bukkitNDatabaseConfig = new BukkitNDatabaseConfig();
@@ -83,6 +102,7 @@ public class BukkitPlatformLoader extends PlatformLoader {
         bukkitNDatabaseConfig.setMariaDBConfig(mariadbConfig);
         bukkitNDatabaseConfig.setSqliteConfig(sqliteConfig);
         bukkitNDatabaseConfig.setMongoDBConfig(mongoDBConfig);
+        bukkitNDatabaseConfig.setCacheRepoConfig(cacheRepoConfig);
 
         return bukkitNDatabaseConfig;
     }

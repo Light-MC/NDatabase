@@ -1,6 +1,8 @@
 package com.nivixx.ndatabase.platforms.bukkitplatform;
 
 import com.nivixx.ndatabase.api.NDatabase;
+import com.nivixx.ndatabase.api.NDatabaseAPI;
+import com.nivixx.ndatabase.api.repository.Repository;
 import com.nivixx.ndatabase.core.PlatformLoader;
 import com.nivixx.ndatabase.core.config.NDatabaseConfig;
 import org.bukkit.Bukkit;
@@ -42,5 +44,10 @@ public class NDatabasePlugin extends JavaPlugin {
         } catch (Throwable e) {
             throw new IllegalStateException("Could not init NDatabase bukkit plugin.", e);
         }
+    }
+
+    @Override
+    public void onDisable() {
+        NDatabase.api().shutdown(); // Flush the cache properly
     }
 }

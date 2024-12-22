@@ -1,7 +1,9 @@
 package com.nivixx.ndatabase.platforms.spongeplatform;
 
 import com.nivixx.ndatabase.core.PlatformLoader;
-import com.nivixx.ndatabase.core.config.*;
+import com.nivixx.ndatabase.core.cache.CacheRepoConfig;
+import com.nivixx.ndatabase.core.config.DatabaseType;
+import com.nivixx.ndatabase.core.config.NDatabaseConfig;
 import com.nivixx.ndatabase.dbms.mariadb.MariaDBConfig;
 import com.nivixx.ndatabase.dbms.mongodb.MongoDBConfig;
 import com.nivixx.ndatabase.dbms.mysql.MysqlConfig;
@@ -82,6 +84,24 @@ public class SpongePlatformLoader extends PlatformLoader {
         mongoDBConfig.setDatabase(mongoDBNode.node("database").getString("ndatabase"));
         mongoDBConfig.setUser(mongoDBNode.node("user").getString(""));
         mongoDBConfig.setPass(mongoDBNode.node("pass").getString(""));
+        
+        ConfigurationNode cacheNode = config.node( "cache");
+        CacheRepoConfig cacheRepoConfig = new CacheRepoConfig();
+        long expireAfterAccessMinutes = cacheNode.node("expire-after-access-minutes").getLong(30);
+        long maximumSize = cacheNode.node("maximum-size").getLong(10_000);
+        int getTimeoutSeconds = cacheNode.node("get-timeout-seconds").getInt(5);
+        boolean enableSoftValues = cacheNode.node("enable-soft-values").getBoolean(false);
+        boolean enableRefreshAfterWrite = cacheNode.node("enable-refresh-after-write").getBoolean(false);
+        long refreshAfterWriteMinutes = cacheNode.node("refresh-after-write-minutes").getLong(30);
+        boolean enableStats = cacheNode.node("enable-stats").getBoolean(false);
+
+        cacheRepoConfig.setExpireAfterAccessMinutes(expireAfterAccessMinutes);
+        cacheRepoConfig.setMaximumSize(maximumSize);
+        cacheRepoConfig.setGetTimeoutSeconds(getTimeoutSeconds);
+        cacheRepoConfig.setEnableSoftValues(enableSoftValues);
+        cacheRepoConfig.setEnableRefreshAfterWrite(enableRefreshAfterWrite);
+        cacheRepoConfig.setRefreshAfterWriteMinutes(refreshAfterWriteMinutes);
+        cacheRepoConfig.setEnableStats(enableStats);
 
         // General Settings
         boolean debug = config.node("debug-mode").getBoolean(false);
@@ -94,6 +114,7 @@ public class SpongePlatformLoader extends PlatformLoader {
         spongeNDatabaseConfig.setMariaDBConfig(mariadbConfig);
         spongeNDatabaseConfig.setSqliteConfig(sqliteConfig);
         spongeNDatabaseConfig.setMongoDBConfig(mongoDBConfig);
+        spongeNDatabaseConfig.setCacheRepoConfig(cacheRepoConfig);
 
         return spongeNDatabaseConfig;
     }

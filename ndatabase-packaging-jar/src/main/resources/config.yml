@@ -64,3 +64,28 @@ database:
     port: 27017
     user: ''
     pass: ''
+
+# Cache settings
+cache:
+  # The minutes to expire the object after accessing it from the cache
+  # When expired, the object will be committed to the database
+  expire-after-access-minutes: 30
+
+  # The maximum objects stored in the cache
+  maximum-size: 10000
+
+  # The timeout in seconds of getting an item in the cache
+  get-timeout-seconds: 5
+
+  # Changing the values to soft-references in the cache, allowing for purging of the values in a GC cycle
+  # This should be enabled if you have problems with memory
+  enable-soft-values: false
+
+  # Refreshes the value from the database asynchronously after writing
+  enable-refresh-after-write: false
+
+  # The amount of minutes after a write to refresh
+  refresh-after-write-minutes: 30
+
+  # Collects statistics about the cache
+  enable-stats: false

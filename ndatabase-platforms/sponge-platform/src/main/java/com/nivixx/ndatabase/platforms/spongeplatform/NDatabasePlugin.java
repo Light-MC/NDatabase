@@ -7,6 +7,7 @@ import org.spongepowered.api.Sponge;
 import org.spongepowered.api.config.ConfigRoot;
 import org.spongepowered.api.event.Listener;
 import org.spongepowered.api.event.lifecycle.ConstructPluginEvent;
+import org.spongepowered.api.event.lifecycle.StoppedGameEvent;
 import org.spongepowered.configurate.ConfigurationNode;
 import org.spongepowered.configurate.hocon.HoconConfigurationLoader;
 import org.spongepowered.plugin.PluginContainer;
@@ -51,6 +52,11 @@ public class NDatabasePlugin {
     public void onConstructPlugin(final ConstructPluginEvent event) {
         loadConfig();
         loadPlatform();
+    }
+
+    @Listener
+    public void onDisable(final StoppedGameEvent event) {
+        NDatabase.api().shutdown(); // flush cache
     }
 
     private void loadPlatform() {

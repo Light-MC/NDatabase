@@ -1,5 +1,6 @@
 package com.nivixx.ndatabase.core.config;
 
+import com.nivixx.ndatabase.core.cache.CacheRepoConfig;
 import com.nivixx.ndatabase.dbms.mariadb.MariaDBConfig;
 import com.nivixx.ndatabase.dbms.mongodb.MongoDBConfig;
 import com.nivixx.ndatabase.dbms.mysql.MysqlConfig;
@@ -15,6 +16,7 @@ public class NDatabaseConfig {
     protected MysqlConfig mysqlConfig;
     protected SqliteConfig sqliteConfig;
     protected MongoDBConfig mongoDBConfig;
+    protected CacheRepoConfig cacheRepoConfig;
 
     protected boolean isDebugMode = false;
     protected int idleThreadPoolSize = 1;
@@ -85,5 +87,13 @@ public class NDatabaseConfig {
 
     public void setIdleThreadPoolSize(int idleThreadPoolSize) {
         this.idleThreadPoolSize = idleThreadPoolSize;
+    }
+
+    public CacheRepoConfig getCacheRepoConfig() {
+        return cacheRepoConfig;
+    }
+
+    public void setCacheRepoConfig(CacheRepoConfig cacheRepoConfig) {
+        this.cacheRepoConfig = cacheRepoConfig;
     }
 }
