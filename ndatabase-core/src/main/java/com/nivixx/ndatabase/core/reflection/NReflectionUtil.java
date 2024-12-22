@@ -29,7 +29,8 @@ public class NReflectionUtil {
     }
 
     public static boolean isNativeJavaClass(Class<?> type) {
-        return type.isPrimitive() || type.isEnum() || type.getPackage().getName().startsWith("java.");
+        Package classPackage = type.getPackage();
+        return type.isPrimitive() || type.isEnum() || (classPackage != null && classPackage.getName().startsWith("java."));
     }
 
     public static void resolveIndexedFieldsFromEntity(List<SingleNodePath> nodePaths, SingleNodePath parentNode, Object entity) throws NoSuchMethodException, InvocationTargetException, InstantiationException, IllegalAccessException {
