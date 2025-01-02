@@ -79,7 +79,6 @@ public class RepositoryManager<K,V extends NEntity<K>> {
             String pluginName = extractPluginName(classLoader.toString());
             pluginEntityMap.computeIfAbsent(pluginName, k -> ConcurrentHashMap.newKeySet())
                     .add(entityType);
-            System.out.println("Associating entity " + entityType + " with plugin " + pluginName);
         }
 
         return repository;
@@ -96,38 +95,31 @@ public class RepositoryManager<K,V extends NEntity<K>> {
             for (Class<V> entityClass : pluginEntities) {
                 Repository<K,V> repository = repositoryCache.get(entityClass);
                 if (repository instanceof CachedRepositoryImpl) {
-                    System.out.println("Shutting down cache for " + entityClass);
                     ((CachedRepositoryImpl<K,V>) repository).shutdown();
                 }
             }
         }
 
         pluginEntityMap.remove(callingPlugin);
-
-        System.out.println("Size of pluginEntityMap after flushing caches: " + pluginEntityMap.size());
     }
 
     private String findCallingPlugin() {
-        System.out.println("Finding calling plugin");
         StackTraceElement[] stackTrace = Thread.currentThread().getStackTrace();
         for (int i = 2; i < stackTrace.length; i++) {
             try {
                 Class<?> callingClass = Class.forName(stackTrace[i].getClassName());
                 ClassLoader classLoader = callingClass.getClassLoader();
-                System.out.println("Checking class loader " + classLoader);
                 if (classLoader != null &&
                         classLoader.toString().contains("PluginClassLoader") &&
                         !classLoader.toString().contains("NDatabase")) {
                     String pluginName = extractPluginName(classLoader.toString());
                     if (pluginName != null) {
-                        System.out.println("Found calling plugin " + pluginName);
                         return pluginName;
                     }
                 }
             } catch (ClassNotFoundException ignored) {}
         }
 
-        System.out.println("Could not find calling plugin");
         return null;
     }
 
