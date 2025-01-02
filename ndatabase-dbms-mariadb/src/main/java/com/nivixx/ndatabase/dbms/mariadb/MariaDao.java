@@ -43,26 +43,29 @@ public class MariaDao<K, V extends NEntity<K>> extends JdbcDao<K,V> {
         String fieldPath = singleNodePath.getFullPath(".");
         Class<?> fieldType = singleNodePath.getLastNodeType();
 
-        String addColumnQuery = MessageFormat.format(
-                "ALTER TABLE {0} ADD COLUMN {1} {2} GENERATED ALWAYS AS" +
-                        "(JSON_VALUE(`{3}`,'$.{4}'))",
-                collectionName, columnName, getColumnType(false, fieldType),
-                DATA_IDENTIFIER, fieldPath);
+        // Using string concatenation or StringBuilder instead of MessageFormat
+        // to avoid conflicts with SQL escape sequences
+        String addColumnQuery = new StringBuilder()
+                .append("ALTER TABLE ").append(collectionName)
+                .append(" ADD COLUMN ").append(columnName)
+                .append(" ").append(getColumnType(false, fieldType))
+                .append(" GENERATED ALWAYS AS (JSON_VALUE(`")
+                .append(DATA_IDENTIFIER).append("`, '$.").append(fieldPath).append("'))")
+                .toString();
 
         try (PreparedStatement ps = connection.prepareStatement(addColumnQuery)) {
             ps.execute();
-        }
-        catch (SQLException e) {
-            // TODO better way may be possible
-            if(!e.getMessage().toLowerCase().contains("duplicate column name")) {
+        } catch (SQLException e) {
+            if (!e.getMessage().toLowerCase().contains("duplicate column name")) {
                 throw e;
             }
         }
 
-        // Index this column if not exist
-        String createIndexQuery = MessageFormat.format(
-                "CREATE INDEX IF NOT EXISTS {0}_index ON {1}({2})",
-                columnName, collectionName, columnName);
+        String createIndexQuery = "CREATE INDEX IF NOT EXISTS " +
+                columnName + "_index" +
+                " ON " + collectionName +
+                "(" + columnName + ")";
+
         try (PreparedStatement ps = connection.prepareStatement(createIndexQuery)) {
             ps.execute();
         }

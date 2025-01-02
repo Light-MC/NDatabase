@@ -40,7 +40,7 @@ public abstract class PlatformLoader extends AbstractModule {
                 bind(DatabaseConnection.class).toInstance(hikariConnectionPool);
                 break;
             case MARIADB:
-                HikariMariaConnectionPool hikariConnectionPoolMaria = new HikariMariaConnectionPool(nDatabaseConfig.getMariaDBConfig());
+                HikariMariaConnectionPool hikariConnectionPoolMaria = new HikariMariaConnectionPool(nDatabaseConfig.getMariaDBConfig(), dbLogger, libraryManager);
                 bind(HikariMariaConnectionPool.class).toInstance(hikariConnectionPoolMaria);
                 bind(DatabaseConnection.class).toInstance(hikariConnectionPoolMaria);
                 break;

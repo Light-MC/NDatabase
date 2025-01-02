@@ -17,19 +17,19 @@ import com.nivixx.ndatabase.platforms.coreplatform.logging.DBLogger;
 
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class RepositoryManager<K,V extends NEntity<K>> {
 
     private final Map<Class<V>, Repository<K,V>> repositoryCache;
+    private final Map<String, Set<Class<V>>> pluginEntityMap;
 
     private final DatabaseTypeResolver databaseTypeResolver;
 
     public RepositoryManager() {
         this.repositoryCache = new ConcurrentHashMap<>();
+        this.pluginEntityMap = new ConcurrentHashMap<>();
         this.databaseTypeResolver = new DatabaseTypeResolver();
     }
 
@@ -65,7 +65,6 @@ public class RepositoryManager<K,V extends NEntity<K>> {
 
         CacheRepoConfig cacheRepoConfig = Injector.resolveInstance(NDatabaseConfig.class).getCacheRepoConfig();
 
-
         // Init repository
         DBLogger dbLogger = Injector.resolveInstance(DBLogger.class);
         SyncExecutor syncExecutor = Injector.resolveInstance(SyncExecutor.class);
@@ -75,19 +74,72 @@ public class RepositoryManager<K,V extends NEntity<K>> {
                 new RepositoryImpl<>(dao, entityType, syncExecutor, asyncThreadPool, dbLogger);
         repositoryCache.put(entityType, repository);
 
-        System.out.println("Size of cache: " + repositoryCache.size());
+        ClassLoader classLoader = entityType.getClassLoader();
+        if (classLoader != null && classLoader.toString().contains("PluginClassLoader")) {
+            String pluginName = extractPluginName(classLoader.toString());
+            pluginEntityMap.computeIfAbsent(pluginName, k -> ConcurrentHashMap.newKeySet())
+                    .add(entityType);
+            System.out.println("Associating entity " + entityType + " with plugin " + pluginName);
+        }
 
         return repository;
     }
 
     public void shutdownCache() throws NDatabaseException {
-        System.out.println("Shutting down cached repositories. Amount: " + repositoryCache.size());
-        for (Repository<?, ?> repository : repositoryCache.values()) {
-            if (repository instanceof CachedRepositoryImpl) {
-                ((CachedRepositoryImpl<?, ?>) repository).shutdown();
+        String callingPlugin = findCallingPlugin();
+        if (callingPlugin == null) {
+            throw new NDatabaseException("Could not find the calling plugin");
+        }
+
+        Set<Class<V>> pluginEntities = pluginEntityMap.get(callingPlugin);
+        if (pluginEntities != null) {
+            for (Class<V> entityClass : pluginEntities) {
+                Repository<K,V> repository = repositoryCache.get(entityClass);
+                if (repository instanceof CachedRepositoryImpl) {
+                    System.out.println("Shutting down cache for " + entityClass);
+                    ((CachedRepositoryImpl<K,V>) repository).shutdown();
+                }
             }
         }
-        repositoryCache.clear();
+
+        pluginEntityMap.remove(callingPlugin);
+
+        System.out.println("Size of pluginEntityMap after flushing caches: " + pluginEntityMap.size());
+    }
+
+    private String findCallingPlugin() {
+        System.out.println("Finding calling plugin");
+        StackTraceElement[] stackTrace = Thread.currentThread().getStackTrace();
+        for (int i = 2; i < stackTrace.length; i++) {
+            try {
+                Class<?> callingClass = Class.forName(stackTrace[i].getClassName());
+                ClassLoader classLoader = callingClass.getClassLoader();
+                System.out.println("Checking class loader " + classLoader);
+                if (classLoader != null &&
+                        classLoader.toString().contains("PluginClassLoader") &&
+                        !classLoader.toString().contains("NDatabase")) {
+                    String pluginName = extractPluginName(classLoader.toString());
+                    if (pluginName != null) {
+                        System.out.println("Found calling plugin " + pluginName);
+                        return pluginName;
+                    }
+                }
+            } catch (ClassNotFoundException ignored) {}
+        }
+
+        System.out.println("Could not find calling plugin");
+        return null;
+    }
+
+    private String extractPluginName(String classLoaderString) {
+        //PluginClassLoader{plugin=ndbTest v1.0-SNAPSHOT, pluginEnabled=false}
+        // plugin name would be ndbTest v1.0-SNAPSHOT
+        int start = classLoaderString.indexOf("plugin=") + 7;
+        int end = classLoaderString.indexOf(", pluginEnabled=", start);
+        if (start > 0 && end > start) {
+            return classLoaderString.substring(start, end);
+        }
+        return null;
     }
 
     private V createEntityInstance(Class<V> entityClass) throws DatabaseCreationException {

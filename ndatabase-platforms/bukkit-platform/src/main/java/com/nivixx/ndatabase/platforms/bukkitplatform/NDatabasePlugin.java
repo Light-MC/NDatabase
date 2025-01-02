@@ -45,9 +45,4 @@ public class NDatabasePlugin extends JavaPlugin {
             throw new IllegalStateException("Could not init NDatabase bukkit plugin.", e);
         }
     }
-
-    @Override
-    public void onDisable() {
-        NDatabase.api().shutdown(); // Flush the cache properly
-    }
 }
